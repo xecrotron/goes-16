@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from osgeo import gdal, gdal_array, osr
 import xarray as xr
+import pathlib
 import numpy as np
 from collections import defaultdict
 import s3fs
@@ -35,6 +36,19 @@ def create_temp(r, g, b, store):
     red_options   = ConversionOptions(filename=f"{store}/{r}")
     green_options = ConversionOptions(filename=f"{store}/{g}")
     store         = store + "/temp.tif"
+
+def calc_cloud_cover(file_name):
+    file = xr.open_dataset(file_name)
+    data = np.array(file["DQF"].values)
+    unique, counts = np.unique(data, return_counts=True)
+    ans = dict(zip(unique, counts))
+    h, w = data.shape
+    return ans[0.0]/ (h*w)
+
+def calc_dataset_cloud_cover():
+   files = pathlib.Path("DATA").glob("**/**/**/*-ACHAC-*.nc")
+   for f in files:
+       print(calc_cloud_cover(f))
 
 def create_rgb(r, g, b, store):
     R = xr.open_dataset(f"{store}/{r}")
@@ -144,10 +158,11 @@ def download_day(url):
                 v.append(FS.ls(file)[0])
                 file = f"s3://noaa-goes16/ABI-L2-FDCC/{YEAR}/{day}/{hour}"
                 v.append(FS.ls(file)[0])
+                file = f"s3://noaa-goes16/ABI-L2-ACHAC/{YEAR}/{day}/{hour}"
+                v.append(FS.ls(file)[0])
                 FS.get(v, f"{img_dir}/")
                 temp = sorted(os.listdir(img_dir))
                 loc = img_dir
-                # create_rgb(temp[1], temp[2], temp[0], loc)
                 create_rgb_new(temp[1], temp[2], temp[0], loc)
 
             except Exception as e:
