@@ -234,7 +234,7 @@ class Goes16Converter(Converters):
 
     def extract_and_merge_rgb_bands(self, red_options, green_options, blue_options, store):
         red_band_data = self._extract_netcdf_image(red_options, "Rad")
-        red_band_data = rebin(np.array(red_band_data), [3000, 5000])
+        red_band_data = rebin(np.array(red_band_data), [1000, 1000])
         green_band_data = self._extract_netcdf_image(green_options, "Rad")
         blue_band_data = self._extract_netcdf_image(blue_options, "Rad")
 

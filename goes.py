@@ -15,7 +15,8 @@ FS = s3fs.S3FileSystem(anon=True)
 ROOT_DIR = "DATA"
 DAY, MONTH, YEAR = 20, 8, 2023
 DATE_DELTA = 0
-FREQ = 12
+FREQ = 60 #MINUTE frequency
+HOUR_FREQ = 2 #HOUR frequency
 
 
 def rebin(arr, new_shape):
@@ -56,7 +57,7 @@ def create_rgb(r, g, b, store):
     G = xr.open_dataset(f"{store}/{g}")
 
     band_1 = R['Rad'].values
-    band_1 = rebin(np.array(band_1), [3000, 5000])
+    # band_1 = rebin(np.array(band_1), [3000, 5000])
     band_2 = G['Rad'].values  
     band_3 = B['Rad'].values
 
@@ -138,7 +139,7 @@ def download_day(url):
     day = (datetime(YEAR, 1, 1) + timedelta(days=days_year_start))
     day_dir = ROOT_DIR + f"/{day.day - 1}-{day.month}-{day.year}"
     os.mkdir(day_dir)
-    bar = tqdm(files[::2], desc=f"Date: {day.day -1}-{day.month}-{day.year}")
+    bar = tqdm(files[::HOUR_FREQ], desc=f"Date: {day.day -1}-{day.month}-{day.year}")
     for hour in bar:
         hrs = hour.split("/")[-1]
         hrs_dir = day_dir + f"/{hrs}"
@@ -147,21 +148,58 @@ def download_day(url):
         img_files = FS.ls(hour)
         for img in img_files[::FREQ]:
             par = parse_filename(img.split("/")[-1])
-            channel_dict[par["start_time"]].append(img)
+            if "RadM1" in img:
+                channel_dict[par["start_time"]].append(img)
         for k, v in channel_dict.items():
             img_dir = hrs_dir + f"/{str(k).replace(' ', '-')}"
             os.mkdir(img_dir)
             bar.set_description(f"Downloading {k}")
             try:
                 day, hour = v[0].split("/")[-3], v[0].split("/")[-2]
-                file = f"s3://noaa-goes16/ABI-L2-LSTC/{YEAR}/{day}/{hour}"
-                v.append(FS.ls(file)[0])
-                file = f"s3://noaa-goes16/ABI-L2-FDCC/{YEAR}/{day}/{hour}"
-                v.append(FS.ls(file)[0])
-                file = f"s3://noaa-goes16/ABI-L2-ACHAC/{YEAR}/{day}/{hour}"
-                v.append(FS.ls(file)[0])
+
+                file = f"s3://noaa-goes18/ABI-L2-LSTM/{YEAR}/{day}/{hour}"
+                files = FS.ls(file)
+                if len(files) == 0:
+                    raise ValueError("Wrong url for LSTM")
+                lstm_dir = img_dir + "/lstm"
+                os.mkdir(lstm_dir)
+                down_files = []
+                for f in files:
+                    if "LSTM1" in f:
+                        down_files.append(f)
+                FS.get(down_files, lstm_dir)
+
+                file = f"s3://noaa-goes18/ABI-L2-FDCM/{YEAR}/{day}/{hour}"
+                files = FS.ls(file)
+                if len(files) == 0:
+                    raise ValueError("Wrong url for FDCM")
+                fdcm_dir = img_dir + "/FDCM"
+                os.mkdir(fdcm_dir)
+                down_files = []
+                for f in files:
+                    if "FDCM1" in f:
+                        down_files.append(f)
+                FS.get(down_files, fdcm_dir)
+
+                file = f"s3://noaa-goes18/ABI-L2-ACHAM/{YEAR}/{day}/{hour}"
+                files = FS.ls(file)
+                if len(files) == 0:
+                    raise ValueError("Wrong url for ACHAM")
+                acham_dir = img_dir + "/ACHAM"
+                os.mkdir(acham_dir)
+                down_files = []
+                for f in files:
+                    if "ACHAM1" in f:
+                        down_files.append(f)
+                FS.get(down_files, acham_dir)
+
                 FS.get(v, f"{img_dir}/")
-                temp = sorted(os.listdir(img_dir))
+
+                temp = []
+                for f in sorted(os.listdir(img_dir)):
+                    if os.path.isfile(os.path.join(img_dir, f)):
+                        temp.append(f)
+
                 loc = img_dir
                 create_rgb_new(temp[1], temp[2], temp[0], loc)
 
@@ -174,7 +212,7 @@ if __name__ == "__main__":
     start_date = datetime(YEAR, MONTH, DAY)
     days_since_year_start = (start_date - datetime(YEAR, 1, 1)).days
 
-    files = FS.ls(f"s3://noaa-goes16/ABI-L1b-RadC/{YEAR}/")
+    files = FS.ls(f"s3://noaa-goes18/ABI-L1b-RadM/{YEAR}/")
     end_date = start_date + timedelta(days=DATE_DELTA)
     if end_date > datetime.now():
         raise ValueError("End days is past today")
