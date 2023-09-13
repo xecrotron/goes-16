@@ -64,13 +64,25 @@ def create_rgb(r, g, b):
 
     print("Merged GeoTIFF file created successfully!")
 
-goes16 = Goes16Converter(verbose=True, debug=True)
+
+def create_band(band, store):
+    goes16        = Goes16Converter(verbose=False, debug=False)
+    store         = store + f"/{store.split('/')[-1]}.tif"
+    band  = ConversionOptions(filename=f"{band}")
+    goes16.extract_bands(band, store)
+
+# goes16 = Goes16Converter(verbose=True, debug=True)
 store = "output.tif"
-ds = xr.open_dataset("./DATA/15-8-2023/20/2023-08-15 20:01:17.300000/OR_ABI-L1b-RadC-M6C07_G16_s20232272001173_e20232272003558_c20232272004000.nc")
-print(ds)
-red_options = ConversionOptions(filename="./DATA/15-8-2023/20/2023-08-15 20:01:17.300000/OR_ABI-L1b-RadC-M6C07_G16_s20232272001173_e20232272003558_c20232272004000.nc")
-green_options = ConversionOptions(filename="./DATA/15-8-2023/20/2023-08-15 20:01:17.300000/OR_ABI-L1b-RadC-M6C06_G16_s20232272001173_e20232272003552_c20232272003586.nc")
-blue_options  = ConversionOptions(filename="./DATA/15-8-2023/20/2023-08-15 20:01:17.300000/OR_ABI-L1b-RadC-M6C05_G16_s20232272001173_e20232272003547_c20232272003580.nc")
-# goes16.extract_and_merge_rgb_bands(red_options, green_options, blue_options, store)
-goes16.extract_and_merge_temp_bands(red_options, green_options, blue_options, store)
-# goes16.extract(extract_args, "Rad")
+# ds = xr.open_dataset("./DATA/15-8-2023/20/2023-08-15 20:01:17.300000/OR_ABI-L1b-RadC-M6C07_G16_s20232272001173_e20232272003558_c20232272004000.nc")
+# print(ds)
+# red_options = ConversionOptions(filename="./DATA/15-8-2023/20/2023-08-15 20:01:17.300000/OR_ABI-L1b-RadC-M6C07_G16_s20232272001173_e20232272003558_c20232272004000.nc")
+# green_options = ConversionOptions(filename="./DATA/15-8-2023/20/2023-08-15 20:01:17.300000/OR_ABI-L1b-RadC-M6C06_G16_s20232272001173_e20232272003552_c20232272003586.nc")
+# blue_options  = ConversionOptions(filename="./DATA/15-8-2023/20/2023-08-15 20:01:17.300000/OR_ABI-L1b-RadC-M6C05_G16_s20232272001173_e20232272003547_c20232272003580.nc")
+# # goes16.extract_and_merge_rgb_bands(red_options, green_options, blue_options, store)
+# goes16.extract_and_merge_temp_bands(red_options, green_options, blue_options, store)
+# # goes16.extract(extract_args, "Rad")
+file = "./DATA/20-8-2023/00/2023-08-20-00:01:17/OR_ABI-L2-FDCC-M6_G16_s20232320001170_e20232320003543_c20232320004418.nc"
+x = xr.open_dataset(file)
+# print(x)
+create_band(file, "./")
+# x = xr.open_dataset("../DATA/20-8-2023/00/2023-08-20-00:00:27.800000/OR_ABI-L2-FDCM1-M6_G18_s20232320000278_e20232320000335_c20232320000528.nc")

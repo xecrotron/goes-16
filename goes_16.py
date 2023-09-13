@@ -31,12 +31,12 @@ def calc_cloud_cover(file_name):
     return ans[0.0]/ (h*w)
 
 def calc_dataset_cloud_cover():
-    files = pathlib.Path(ROOT_DIR).glob("**/**/**/*-ACHAM1-*.nc")
+    files = pathlib.Path(ROOT_DIR).glob("**/**/**/*-ACHAC-*.nc")
     total_cloud_coverage = 0
     for f in files:
         cloud_cov = calc_cloud_cover(f)
-        total_cloud_coverage += cloud_cov
-    files = pathlib.Path(ROOT_DIR).glob("**/**/**/*-ACHAM1-*.nc")
+        total_cloud_coverage += calc_cloud_cover(f)
+    files = pathlib.Path(ROOT_DIR).glob("**/**/**/*-ACHAC-*.nc")
     with open(f"./{ROOT_DIR}/cloud.json", "w") as f:
          avg_cov = total_cloud_coverage / len(list(files))
          json.dump({"avg_cloud_cov": avg_cov}, f)
@@ -154,9 +154,9 @@ def download_day(url):
         os.mkdir(hrs_dir)
         channel_dict = defaultdict(list)
         img_files = FS.ls(hour)
-        for img in img_files[::FREQ]:
+        for img in img_files:
             par = parse_filename(img.split("/")[-1])
-            if "RadM1" in img:
+            if "RadC" in img:
                 channel_dict[par["start_time"]].append(img)
         for k, v in channel_dict.items():
             img_dir = hrs_dir + f"/{str(k).replace(' ', '-')}"
@@ -165,28 +165,28 @@ def download_day(url):
             try:
                 day, hour = v[0].split("/")[-3], v[0].split("/")[-2]
 
-                file = f"s3://noaa-goes18/ABI-L2-LSTM/{YEAR}/{day}/{hour}"
+                file = f"s3://noaa-goes16/ABI-L2-LSTC/{YEAR}/{day}/{hour}"
                 files = FS.ls(file)
                 if len(files) == 0:
                     raise ValueError("Wrong url for LSTM")
                 for f in files:
-                    if "LSTM1" in f and parse_filename(f.split("/")[-1])["start_time"]==k:
+                    if "LSTC" in f and parse_filename(f.split("/")[-1])["start_time"]==k:
                         v.append(f)
 
-                file = f"s3://noaa-goes18/ABI-L2-FDCM/{YEAR}/{day}/{hour}"
+                file = f"s3://noaa-goes16/ABI-L2-FDCC/{YEAR}/{day}/{hour}"
                 files = FS.ls(file)
                 if len(files) == 0:
                     raise ValueError("Wrong url for FDCM")
                 for f in files:
-                    if "FDCM1" in f and parse_filename(f.split("/")[-1])["start_time"] == k:
+                    if "FDCC" in f and parse_filename(f.split("/")[-1])["start_time"] == k:
                         v.append(f)
 
-                file = f"s3://noaa-goes18/ABI-L2-ACHAM/{YEAR}/{day}/{hour}"
+                file = f"s3://noaa-goes16/ABI-L2-ACHAC/{YEAR}/{day}/{hour}"
                 files = FS.ls(file)
                 if len(files) == 0:
                     raise ValueError("Wrong url for ACHAM")
                 for f in files:
-                    if "ACHAM1" in f and parse_filename(f.split("/")[-1])["start_time"] == k:
+                    if "ACHAC" in f and parse_filename(f.split("/")[-1])["start_time"] == k:
                         v.append(f)
                 FS.get(v, f"{img_dir}/")
 
@@ -197,6 +197,7 @@ def download_day(url):
 
                 loc = img_dir
                 create_rgb_new(temp[1], temp[2], temp[0], loc)
+                break
 
             except Exception as e:
                 print(f"Error: {e}")
@@ -207,7 +208,7 @@ if __name__ == "__main__":
     start_date = datetime(YEAR, MONTH, DAY)
     days_since_year_start = (start_date - datetime(YEAR, 1, 1)).days
 
-    files = FS.ls(f"s3://noaa-goes18/ABI-L1b-RadM/{YEAR}/")
+    files = FS.ls(f"s3://noaa-goes16/ABI-L1b-RadC/{YEAR}/")
     end_date = start_date + timedelta(days=DATE_DELTA)
     if end_date > datetime.now():
         raise ValueError("End days is past today")

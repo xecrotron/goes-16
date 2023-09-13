@@ -232,14 +232,36 @@ class Goes16Converter(Converters):
 
         return image
 
+    def create_band_new(self, band_data, store):
+        (y_res, x_res) = band_data.shape
+        export_type = osgeo.gdal_array.NumericTypeCodeToGDALTypeCode(np.uint8)
+
+        # Create a new GeoTIFF image
+        gtiff_driver = osgeo.gdal.GetDriverByName('GTiff')
+        image = gtiff_driver.Create(store, x_res, y_res, eType=export_type)
+        image.SetProjection(self.latlng_projection().ExportToWkt())
+        image.SetGeoTransform(self.geo_transform(self.extents_WGS84, y_res, x_res))
+        band = image.GetRasterBand(0)
+        band.WriteArray(band_data)
+        return image
+
     def extract_and_merge_rgb_bands(self, red_options, green_options, blue_options, store):
         red_band_data = self._extract_netcdf_image(red_options, "Rad")
-        red_band_data = rebin(np.array(red_band_data), [1000, 1000])
         green_band_data = self._extract_netcdf_image(green_options, "Rad")
         blue_band_data = self._extract_netcdf_image(blue_options, "Rad")
+        red_band_data = rebin(np.array(red_band_data), [3000, 5000])
 
         # tiff_data = self.merge_rgb_bands(red_band_data, green_band_data, blue_band_data, store)
         tiff_data = self.merge_rgb_bands_new(red_band_data, green_band_data, blue_band_data, store)
+        return tiff_data
+
+    def extract_bands(self, band_option, store):
+        area_data = self._extract_netcdf_image(band_option, "Area")
+        temp_data = self._extract_netcdf_image(band_option, "Temp")
+        mask_data = self._extract_netcdf_image(band_option, "Mask")
+        power_data = self._extract_netcdf_image(band_option, "Power")
+        power_data = self._extract_netcdf_image(band_option, "DQF")
+        # tiff_data = self.create_band_new(band_data, store)
         return tiff_data
 
 
