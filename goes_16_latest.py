@@ -1,11 +1,14 @@
 from datetime import datetime
-from numpy import save
+from fsspec.config import json
 from osgeo import gdal
-from collections import defaultdict
+import shutil
+import numpy as np
 import s3fs
 import os
+import json
 from bbox import Bbox, Bboxs, Point
 from osgeo import osr
+from PIL import Image
 
 class GoesDownloaderLatest:
     def __init__(self) -> None:
@@ -14,9 +17,68 @@ class GoesDownloaderLatest:
         self.day, self.month, self.year = 20, 9, 2023
         self.boxes = Bboxs.read_file().boxes
         self.__convert_to_WGS__()
-        os.mkdir(f"{self.root_dir}")
+        self.json_file = "cloud.json"
+
+        if not os.path.exists(self.root_dir):
+            os.mkdir(f"{self.root_dir}")
+
         for box in self.boxes:
-            os.mkdir(f"{self.root_dir}/{box.id}")
+            if not os.path.exists(f"{self.root_dir}/{box.id}"):
+                os.mkdir(f"{self.root_dir}/{box.id}")
+
+        self.__bbox_cloud_covers__()
+
+    def __bbox_cloud_covers__(self):
+        temp_file = "tmp"
+        os.mkdir(temp_file)
+        file_achac_year = self.fs.ls(f"s3://noaa-goes16/{'ABI-L2-ACHAC'}/{self.year}/")[-1]
+        file_achac_day = self.fs.ls(f"s3://{file_achac_year}")[-1]
+        files_achac_hour = self.fs.ls(f"s3://{file_achac_day}")
+        self.fs.get(files_achac_hour, f"{temp_file}")
+        bbox_lowest_cloud_path = {}
+        bbox_lowest_cloud_value = {}
+
+        for file in os.listdir(temp_file):
+            layer = gdal.Open("NETCDF:{0}:{1}".format(f"./{temp_file}/{file}", "DQF"))
+            options = gdal.TranslateOptions(format="GTiff")
+            file_name = file.replace('.nc', '.tif')
+            gdal.Translate(f"./{temp_file}/{file_name}", layer, options=options)
+            os.remove(f"{temp_file}/{file}")
+
+        OutSR = osr.SpatialReference()
+        OutSR.SetFromUserInput("ESRI:102498")
+        for box in self.boxes:
+            os.mkdir(f"{temp_file}/{box.id}")
+            cloud_cover, cloud_file = -1, None
+            for file in os.listdir(temp_file):
+                if os.path.isdir(f"./{temp_file}/{file}") or file.split(".")[-1] == "json":
+                    continue
+                options = gdal.WarpOptions(format="GTiff",
+                                           srcSRS=OutSR,
+                                           dstSRS=OutSR,
+                                           cutlineDSName=f"{box.path}",
+                                           cropToCutline=True,
+                                           copyMetadata=True)
+
+                gdal.Warp(f"./{temp_file}/{box.id}/{file}",
+                          f"./{temp_file}/{file}",
+                          options=options)
+
+            for bbox in os.listdir(f"./{temp_file}/{box.id}/"):
+                im = Image.open(f"./{temp_file}/{box.id}/{bbox}")
+                imarray = np.array(im)
+                shape = imarray.shape
+                unique, counts = np.unique(imarray, return_counts=True)
+                nc_dict = dict(zip(unique, counts))
+                density = nc_dict[0.0] / (shape[0] * shape[1])
+                if density > cloud_cover:
+                    cloud_cover = max(cloud_cover, density)
+                    cloud_file = bbox
+            bbox_lowest_cloud_path[box] = cloud_file
+            bbox_lowest_cloud_value[box.id] = cloud_cover
+        self.bbox_cloud_cover = bbox_lowest_cloud_path
+        self.bbox_cloud_value = bbox_lowest_cloud_value
+        shutil.rmtree(f"./{temp_file}")
 
     def __convert_to_WGS__(self):
         boxes = []
@@ -77,21 +139,31 @@ class GoesDownloaderLatest:
         self.fs.get(files_achac_hour, f"{self.root_dir}")
 
         for box in self.boxes:
-            os.mkdir(f"{self.root_dir}/{box.id}/{save_location}/")
+            if not os.path.exists(f"{self.root_dir}/{box.id}/{save_location}"):
+                os.mkdir(f"{self.root_dir}/{box.id}/{save_location}/")
 
         OutSR = osr.SpatialReference()
         OutSR.SetFromUserInput("ESRI:102498")
 
         for file in os.listdir(f"./{self.root_dir}"):
-            if os.path.isdir(f"./{self.root_dir}/{file}"):
+            if os.path.isdir(f"./{self.root_dir}/{file}") or file.split(".")[-1] == "json":
                 continue
-            file_path = self.filename(file)
-            layer = gdal.Open("NETCDF:{0}:{1}".format(f"./{self.root_dir}/{file}", band))
+            layer = gdal.Open("NETCDF:{0}:{1}".format(f"{self.root_dir}/{file}", band))
             options = gdal.TranslateOptions(format="GTiff")
             file_name = file.replace('.nc', '.tif')
             gdal.Translate(f"./{self.root_dir}/{file_name}", layer, options=options)
             os.remove(f"./{self.root_dir}/{file}")
-            for box in self.boxes:
+
+            
+        for file in os.listdir(f"./{self.root_dir}"):
+            if os.path.isdir(f"./{self.root_dir}/{file}") or file.split(".")[-1] == "json":
+                continue
+            file_path = self.filename(file)
+            for (box, box_file) in self.bbox_cloud_cover.items():
+                min_box_file = self.parse_filename(box_file.replace(".tif", ""))["start_time"]
+                if self.parse_filename(file.replace(".tif", ""))["start_time"] != min_box_file:
+                    continue
+
                 options = gdal.WarpOptions(format="GTiff",
                                            srcSRS=OutSR,
                                            dstSRS=OutSR,
@@ -100,15 +172,28 @@ class GoesDownloaderLatest:
                                            copyMetadata=True)
 
                 gdal.Warp(f"./{self.root_dir}/{box.id}/{save_location}/{file_path}",
-                          f"./{self.root_dir}/{file_name}",
+                          f"./{self.root_dir}/{file}",
                           options=options)
         self.clean_root_dir()
 
     def filename(self, file):
-        par = self.parse_filename(file)
+        par = self.parse_filename(file.replace(".tif", ""))
         file_path = f"{par['start_time'].year}{str(par['start_time'].month).zfill(2)}{str(par['start_time'].day).zfill(2)}T{str(par['start_time'].hour).zfill(2)}{str(par['start_time'].minute).zfill(2)}{str(par['start_time'].second).zfill(2)}{str(par['start_time'].microsecond).zfill(3)}.tif"
         return file_path
 
+    def cloud_json(self):
+        if not os.path.exists(f"./{self.root_dir}/{self.json_file}"):
+            empty_json = {}
+            with open(f"./{self.root_dir}/{self.json_file}", "w") as f:
+                json.dump(empty_json, f)
+
+        with open(f"./{self.root_dir}/{self.json_file}", "r") as f:
+            data = json.load(f)
+
+        with open(f"./{self.root_dir}/{self.json_file}", "w") as f:
+            data[str(datetime.now())] = self.bbox_cloud_value
+            json.dump(data, f)
+            
 
 if __name__ == "__main__":
     down = GoesDownloaderLatest()
@@ -117,3 +202,4 @@ if __name__ == "__main__":
     down.cloud_cover("ABI-L2-FDCC", "area", "Area")
     down.cloud_cover("ABI-L2-FDCC", "power", "Power")
     down.cloud_cover("ABI-L2-FDCC", "temp", "Temp")
+    down.cloud_json()
