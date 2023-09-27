@@ -1,5 +1,4 @@
 from datetime import datetime
-from fsspec.config import json
 from osgeo import gdal
 import shutil
 import numpy as np
