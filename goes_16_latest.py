@@ -129,7 +129,7 @@ class GoesDownloaderLatest:
 
     def clean_root_dir(self):
         for f in os.listdir(self.root_dir):
-            if os.path.isfile(f"{self.root_dir}/{f}"):
+            if os.path.isfile(f"{self.root_dir}/{f}") and f.split(".")[-1] != "json":
                 os.remove(f"{self.root_dir}/{f}")
 
     def cloud_cover(self, param, save_location, band):
