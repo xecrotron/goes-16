@@ -8,6 +8,9 @@ import json
 from bbox import Bbox, Bboxs, Point
 from osgeo import osr
 from PIL import Image
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 class GoesDownloaderLatest:
     def __init__(self) -> None:
@@ -25,6 +28,7 @@ class GoesDownloaderLatest:
             if not os.path.exists(f"{self.root_dir}/{box.id}"):
                 os.mkdir(f"{self.root_dir}/{box.id}")
 
+        logging.info("Calculating cloud cover")
         self.__bbox_cloud_covers__()
 
     def __bbox_cloud_covers__(self):
@@ -69,7 +73,7 @@ class GoesDownloaderLatest:
                 shape = imarray.shape
                 unique, counts = np.unique(imarray, return_counts=True)
                 nc_dict = dict(zip(unique, counts))
-                density = nc_dict[0.0] / (shape[0] * shape[1])
+                density = nc_dict.get(0.0, 1) / (shape[0] * shape[1])
                 if density > cloud_cover:
                     cloud_cover = max(cloud_cover, density)
                     cloud_file = bbox
@@ -132,10 +136,14 @@ class GoesDownloaderLatest:
                 os.remove(f"{self.root_dir}/{f}")
 
     def cloud_cover(self, param, save_location, band):
+        logging.info(f"Downloading Bbox for {param}:{band}")
         file_achac_year = self.fs.ls(f"s3://noaa-goes16/{param}/{self.year}/")[-1]
         file_achac_day = self.fs.ls(f"s3://{file_achac_year}")[-1]
         files_achac_hour = self.fs.ls(f"s3://{file_achac_day}")
-        self.fs.get(files_achac_hour, f"{self.root_dir}")
+        try:
+            self.fs.get(files_achac_hour, f"{self.root_dir}")
+        except Exception as e:
+            logging.error(f"Unable to Download {param} {e}")
 
         for box in self.boxes:
             if not os.path.exists(f"{self.root_dir}/{box.id}/{save_location}"):
@@ -191,6 +199,7 @@ class GoesDownloaderLatest:
 
         with open(f"./{self.root_dir}/{self.json_file}", "w") as f:
             data[str(datetime.now())] = self.bbox_cloud_value
+            logging.info("Saving JSON file")
             json.dump(data, f)
             
 
