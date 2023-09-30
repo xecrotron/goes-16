@@ -1,0 +1,69 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgis/postgis
+    container_name: postgres
+    restart: on-failure
+    healthcheck:
+      test: /usr/bin/pg_isready -U postgres
+      interval: 5s
+      timeout: 10s
+      retries: 120
+    ports:
+      - 5432:5432
+    shm_size: '1gb'
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - pg_data:${PGDATA:-/var/lib/postgresql/data}:rw
+      - ./postgres/01-init-user.sh:/docker-entrypoint-initdb.d/01-init-user.sh
+
+  pgadmin:
+    image:  dpage/pgadmin4
+    container_name: pgadmin
+    restart: always
+    depends_on: 
+      - postgres
+    ports:
+      - 8081:80
+    volumes:
+      - pgadmin-config:/var/lib/pgadmin
+    env_file:
+      - .env
+
+  geoserver:
+    image: geosolutionsit/geoserver:2.23.2
+    container_name: geoserver
+    ports:
+      - 8080:8080
+    environment:
+      - GEOSERVER_LOG_DIR=${GEOSERVER_LOG_DIR}
+      - GEOSERVER_DATA_DIR=${GEOSERVER_DATA_DIR}
+      - GEOWEBCACHE_CONFIG_DIR=${GEOWEBCACHE_CONFIG_DIR}
+      - GEOWEBCACHE_CACHE_DIR=${GEOWEBCACHE_CACHE_DIR}
+      - NETCDF_DATA_DIR=${NETCDF_DATA_DIR}
+      - GRIB_CACHE_DIR=${GRIB_CACHE_DIR}
+      #- PLUGIN_DYNAMIC_URLS="https://sourceforge.net/projects/geoserver/files/GeoServer/2.23.2/extensions/geoserver-2.23.2-netcdf-plugin.zip"
+    volumes:
+      - ./geoserver/logs:${GEOSERVER_LOG_DIR}
+      - ./geoserver/datadir:${GEOSERVER_DATA_DIR}
+      - ./geoserver/gwc_config:${GEOWEBCACHE_CONFIG_DIR}
+      - ./geoserver/gwc:${GEOWEBCACHE_CACHE_DIR}
+      - ./geoserver/netcfd:${NETCDF_DATA_DIR}
+      - ./geoserver/grib_cache:${GRIB_CACHE_DIR}
+    healthcheck:
+      test: "curl --fail --silent --write-out 'HTTP CODE : %{http_code}\n' --output /dev/null -u ${GEOSERVER_ADMIN_USER}:'${GEOSERVER_ADMIN_PASSWORD}' http://localhost:8080/geoserver/rest/about/version.xml"
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+
+volumes:
+  pg_data:
+  pgadmin-config:

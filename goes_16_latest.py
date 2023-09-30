@@ -175,8 +175,7 @@ class GoesDownloaderLatest:
                                            srcSRS=OutSR,
                                            dstSRS=OutSR,
                                            cutlineDSName=f"{box.path}",
-                                           cropToCutline=True,
-                                           copyMetadata=True)
+                                           cropToCutline=True)
 
                 gdal.Warp(f"./{self.root_dir}/{box.id}/{save_location}/{file_path}",
                           f"./{self.root_dir}/{file}",
