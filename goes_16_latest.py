@@ -170,7 +170,7 @@ class GoesDownloaderLatest:
                 min_box_file = self.parse_filename(box_file.replace(".tif", ""))["start_time"]
                 if self.parse_filename(file.replace(".tif", ""))["start_time"] != min_box_file:
                     continue
-
+                    
                 options = gdal.WarpOptions(format="GTiff",
                                            srcSRS=OutSR,
                                            dstSRS=OutSR,
@@ -180,6 +180,13 @@ class GoesDownloaderLatest:
                 gdal.Warp(f"./{self.root_dir}/{box.id}/{save_location}/{file_path}",
                           f"./{self.root_dir}/{file}",
                           options=options)
+
+                # reprojecting raster to EPSG:3857 because it is supported by Geoserver
+                output_file_path = file_path.replace('.tif', 'Z.tif')
+                gdal.Warp(f"./{self.root_dir}/{box.id}/{save_location}/{output_file_path}",
+                          gdal.Open(f"./{self.root_dir}/{box.id}/{save_location}/{file_path}"),
+                          dstSRS='EPSG:3857')
+                os.remove(f"./{self.root_dir}/{box.id}/{save_location}/{file_path}")
         self.clean_root_dir()
 
     def filename(self, file):
