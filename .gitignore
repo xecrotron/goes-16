@@ -2,6 +2,8 @@
 *.pyc
 venv/
 
-# service related
+### service related
 DATA/
 geoserver/
+# logging
+*.log
