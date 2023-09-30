@@ -1,5 +1,6 @@
 # Python files
 *.pyc
+venv/
 
 # service related
 DATA/
