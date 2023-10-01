@@ -1,16 +1,48 @@
 version: '3.9'
 
 services:
+  postgres:
+    image: kartoza/postgis:pr-409-15-3.3
+    ports:
+      - 5432:5432
+    volumes:
+      - db-data:/var/lib/postgresql
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASS=${POSTGRES_PASSWORD}
+      - ALLOW_IP_RANGE=0.0.0.0/0
+      - POSTGRES_MULTIPLE_EXTENSIONS=postgis
+    restart: on-failure
+    healthcheck:
+      test: "PGPASSWORD=${POSTGRES_PASSWORD} pg_isready -h 127.0.0.1 -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+      interval: 1m30s
+      timeout: 20s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+
   pgadmin:
     image:  dpage/pgadmin4
     container_name: pgadmin
     restart: always
     ports:
-      - 8081:80
+      - 8080:80
     volumes:
       - pgadmin-config:/var/lib/pgadmin
-    env_file:
-      - .env
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
 
   geoserver:
     image: geosolutionsit/geoserver:2.23.2
@@ -43,4 +75,5 @@ services:
         max-size: "20m"
 
 volumes:
+  db-data:
   pgadmin-config:
