@@ -1,6 +1,6 @@
 from osgeo import gdal
 import numpy as np
-from osgeo.gdalconst import *
+from osgeo.gdalconst import GDT_Float32
 
 def wildfire_area(in_file, save_loc, default_confidence_value=0):
     conf_map = {10: 1.0,
