@@ -8,6 +8,7 @@ from PIL import Image
 import logging
 import argparse
 from Downloader import Downloader
+from custom_layers import wildfire_area
 
 logging.basicConfig(level=logging.INFO,
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -22,6 +23,47 @@ class GoesDownloaderLatest(Downloader):
 
         logging.info("Calculating cloud cover")
         self.__bbox_cloud_covers__()
+
+    def wildfire_map(self):
+        self.download(datetime.now(), datetime.now(), "ABI-L2-FDCC", latest=True)
+        for box in self.boxes:
+            if not os.path.exists(f"{self.root_dir}/{box.id}/wld_map"):
+                os.mkdir(f"{self.root_dir}/{box.id}/wld_map/")
+        day = os.listdir(f"{self.root_dir}/{self.tmp_dir}/")[0]
+        hour = os.listdir(f"{self.root_dir}/{self.tmp_dir}//{day}")[0]
+        directory = f"{self.root_dir}/{self.tmp_dir}/{day}/{hour}/"
+
+        for file in os.listdir(directory):
+           wildfire_area(f"{directory}/{file}", directory)
+           os.remove(f"{directory}/{file}")
+
+        for file in os.listdir(directory):
+            layer = gdal.Open(f"{directory}/{file}")
+            options = gdal.TranslateOptions(format="GTiff")
+            file_name = file.replace('.nc', '.tif')
+            gdal.Translate(f"{directory}/{file_name}", layer, options=options)
+            os.remove(f"{directory}/{file}")
+
+        OutSR = osr.SpatialReference()
+        OutSR.SetFromUserInput("ESRI:102498")
+
+        for file in os.listdir(directory):
+            file_path = self.filename(file)
+            for (box, box_file) in self.bbox_cloud_cover.items():
+                min_box_file = self.parse_filename(box_file.replace(".tif", ""))["start_time"]
+                if self.parse_filename(file.replace(".tif", ""))["start_time"] != min_box_file:
+                    continue
+                    
+                options = gdal.WarpOptions(format="GTiff",
+                                           srcSRS=OutSR,
+                                           dstSRS='EPSG:3857',
+                                           cutlineDSName=f"{box.path}",
+                                           cropToCutline=True)
+
+                gdal.Warp(f"{self.root_dir}/{box.id}/wld_map/{file_path}",
+                          f"{directory}/{file}",
+                          options=options)
+        self.clean_root_dir()
 
     def __bbox_cloud_covers__(self):
         self.download(datetime.now(), datetime.now(), "ABI-L2-ACHAC", latest=True)
@@ -81,7 +123,7 @@ class GoesDownloaderLatest(Downloader):
         OutSR.SetFromUserInput("ESRI:102498")
 
         day = os.listdir(f"{self.root_dir}/{self.tmp_dir}/")[0]
-        hour = os.listdir(f"{self.root_dir}/{self.tmp_dir}//{day}")[0]
+        hour = os.listdir(f"{self.root_dir}/{self.tmp_dir}/{day}")[0]
         directory = f"{self.root_dir}/{self.tmp_dir}/{day}/{hour}/"
         for file in os.listdir(directory):
             layer = gdal.Open("NETCDF:{0}:{1}".format(f"{directory}/{file}", band))
@@ -136,6 +178,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     down = GoesDownloaderLatest(args.save)
+    down.wildfire_map()
     down.run("ABI-L2-ACHAC", "cloud", "HT")
     down.run("ABI-L2-FDCC", "mask", "Mask")
     down.run("ABI-L2-FDCC", "area", "Area")
