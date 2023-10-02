@@ -23,7 +23,7 @@ class GoesDownloaderDate(Downloader):
         self.start = start
         self.end = end
 
-        logging.info("Calculating cloud cover")
+        logging.info("Calculating cloud cover for Bulk Download")
         self.__bbox_cloud_covers__()
         self.__index_bbox__()
 

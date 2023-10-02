@@ -21,7 +21,7 @@ class GoesDownloaderLatest(Downloader):
     def __init__(self, save_dir) -> None:
         super().__init__(save_dir)
 
-        logging.info("Calculating cloud cover")
+        logging.info("Calculating latest cloud cover")
         self.__bbox_cloud_covers__()
 
     def wildfire_map(self):

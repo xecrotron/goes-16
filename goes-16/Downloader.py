@@ -6,7 +6,6 @@ from osgeo import osr
 from bbox import Point, Bbox, Bboxs
 import shutil
 import logging
-from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO,
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -126,6 +125,7 @@ class Downloader:
                 database_hour = self.fs.ls(f"s3://noaa-goes16/{param}/{start.year}/{day}")
                 file_param_hour = [int(x.split("/")[-1]) for x in database_hour]
             except Exception as e:
+                logging.error(f"Unable to query aws for {day}: {param}")
                 raise ValueError(f"Unable to load aws due to {e}")
 
             if latest:
@@ -141,5 +141,7 @@ class Downloader:
                 try:
                     self.fs.get(files, f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}/")
                 except Exception as e:
+                    logging.error(f"Unable to Download aws data for {day}: {param}")
+                    logging.info(f"Cleaning temp directory")
                     self.clean_root_dir()
                     raise ValueError(f"Unable to Download Data for {param}")
