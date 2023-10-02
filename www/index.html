@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>WMS Time</title>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Series NDVI</title>
+    <link rel="stylesheet" href="https://openlayers.org/en/v4.6.5/css/ol.css" type="text/css">
+    <script src="https://openlayers.org/en/v4.6.5/build/ol.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/ol-layerswitcher@3.8.3/dist/ol-layerswitcher.css" />
+    <script src="https://unpkg.com/ol-layerswitcher@3.8.3"></script>
+
+    <style>
+        /* Setting up the slider styling */
+        .slidecontainer {
+            width: 520px;
+            margin-top: -30px;
+            margin-left: 10px;
+            z-index: 100px;
+        }
+
+        .slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 15px;
+            border-radius: 5px;
+            background: #d3d3d3;
+            outline: none;
+            opacity: 0.7;
+            -webkit-transition: .2s;
+            transition: opacity .2s;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #00008B;
+            cursor: pointer;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+        }
+
+        .map {
+            height: 500px;
+        }
+    </style>
+</head>
+
+<body>
+    <div>
+        <!-- Create map container -->
+        <div id="map" class="map"></div>
+        <div role="group" aria-label="Animation controls">
+
+        <!-- Create slider container -->
+        <div class="slidecontainer">
+            <input type="range" min="0" max="2" value="0" class="slider" id="myRange">
+            <p>Date: <span id="date_value"></span></p>
+            <br><br>
+            <input type="text" id="date-search" name="date-search" placeholder="Date in YYYY-MM-DD format, greater than 2021-06-10" size="50">
+            <input name="dateSubmit" id="dateSubmit" value="Enter" type="submit" />
+        </div>
+    </div>
+
+        <script>
+
+            const map_layer_name = 'dev:ndvi';
+            const max_slider_range = 5;
+            var offset = +0;
+
+            var map, view, layerSwitcher;
+
+            view = new ol.View({
+                projection: 'EPSG:4326',
+                center: [75.47361242834728, 30.85919199600515],
+                zoom: 8
+            });
+
+            map = new ol.Map({
+                target: 'map',
+                view: view
+            });
+
+            var satellite = new ol.layer.Tile({
+                title: 'Satellite',
+                type: 'base',
+                visible: true,
+                source: new ol.source.XYZ({
+                    attributions: ['Powered by Esri',
+                        'Source: Esri, DigitalGlobe, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community'
+                    ],
+                    attributionsCollapsible: false,
+                    url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                    maxZoom: 23
+                })
+            });
+
+            var OSM = new ol.layer.Tile({
+                title: 'OSM',
+                type: 'base',
+                visible: true,
+                source: new ol.source.OSM()
+            });
+
+            var basemaps = new ol.layer.Group({
+                title: 'Base Maps',
+                layers: [satellite]
+            });
+
+            map.addLayer(basemaps);
+
+            var overlays = new ol.layer.Group({
+                title: 'Ovelays',
+                layers:[]
+            });         
+
+            map.addLayer(overlays);
+
+            /*layerSwitcher = new ol.control.LayerSwitcher({
+                activationMode: 'click',
+                startActive: true,
+                tipLabel: 'Layers', // Optional label for button
+                groupSelectStyle: 'children', // Can be 'children' [default], 'group' or 'none'
+                collapseTipLabel: 'Collapse layers',
+            });
+            map.addControl(layerSwitcher);
+
+            layerSwitcher.renderPanel();*/
+
+            var ndvi = new ol.layer.Image({
+                title: 'NDVI',
+                // extent: [-180, -90, -180, 90],
+                source: new ol.source.ImageWMS({
+                    url: 'http://43.204.93.107/geoserver/wms',
+                    params: {
+                        'LAYERS': map_layer_name,
+                    },
+                    ratio: 1,
+                    serverType: 'geoserver'
+                })
+            });
+
+            overlays.getLayers().push(ndvi);
+            //layerSwitcher.renderPanel();
+
+            var sliderRange = document.getElementById("myRange");
+            var dateValue = document.getElementById("date_value");
+            var dateSearchSubmit = document.getElementById("dateSubmit");
+            var dateTextField = document.getElementById("date-search");
+
+            // Fetch the available timestamps
+            var offset = sliderRange.value;
+            var dates = []
+            var parser = new DOMParser();
+            fetch("http://43.204.93.107/geoserver/dev/wms?service=WMS&version=1.1.0&request=GetCapabilities&layers=dev%3Amask")
+                .then((response) => response.text())
+                .then((xml) => {
+                    parsed_response = parser.parseFromString(xml, "text/xml");
+                    const layers_info = parsed_response.getElementsByTagName("Capability")[0].getElementsByTagName("Layer")[0].getElementsByTagName("Layer");
+                    console.log(layers_info)
+                    for (var i = 0; i < layers_info.length; i++) {
+                        const layer_name = layers_info[i].getElementsByTagName("Name")[0].childNodes[0].nodeValue;
+                        const layer_time_extent = layers_info[i].getElementsByTagName("Extent")[0].childNodes[0].nodeValue;
+                        if (layer_name === map_layer_name.replace('dev:', '')) {
+                            console.log(layer_name, layer_time_extent);
+                            dates = layer_time_extent.split(',');
+
+                            sliderRange.max = dates.length - 1 > max_slider_range ? max_slider_range : dates.length - 1;
+                            dateValue.innerHTML = dates[sliderRange.value];
+                            overlays.getLayers().item(0).getSource().updateParams({'TIME': dates[this.value]});
+
+                            break;
+                        }
+                    }
+                });
+
+            // Update the current slider value (each time you drag the slider handle)
+            sliderRange.oninput = function () {
+                var index = parseInt(parseFloat(offset) + parseFloat(this.value));
+                dateValue.innerHTML = dates[index];
+                overlays.getLayers().item(0).getSource().updateParams({'TIME': dates[index]});
+            }
+
+            // Update the map dates array and reloads layer
+            dateSearchSubmit.onclick = function () {
+                var input_date = dateTextField.value;
+
+                // Change offset and max as per the entered date index relative to dates array
+                var index = 0;
+                for (const date of dates) {
+                    if (date.includes(input_date)) {
+                        offset = index;
+                        var remaining_date_array_length = dates.length -1 - index;
+                        sliderRange.max = max_slider_range > remaining_date_array_length ? remaining_date_array_length : max_slider_range;
+                        break;
+                    }
+                    index++;
+                }
+
+                if (index === dates.length) {
+                    // Finding the first date which is bigger than input date, taking it previous one.
+                    var index = -1;
+                    for (const date of dates) {
+                        index++;
+                        if (date > input_date) {
+                            index = index > 0 ? index - 1 : 0;
+                            offset = index;
+                            var remaining_date_array_length = dates.length -1 - index;
+                            sliderRange.max = max_slider_range > remaining_date_array_length ? remaining_date_array_length : max_slider_range;
+                            console.log(offset, remaining_date_array_length)
+                            break;
+                        }
+                    }
+                    if (index === dates.length - 1) {
+                        // We have reached the end of array and not found a bigger date, locking the slider
+                        sliderRange.max = 0;
+                    }
+                }
+                
+                dateValue.innerHTML = dates[index];
+                overlays.getLayers().item(0).getSource().updateParams({'TIME': dates[index]});
+            }
+
+        </script>
+</body>
+
+</html>
