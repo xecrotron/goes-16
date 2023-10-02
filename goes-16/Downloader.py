@@ -6,6 +6,7 @@ from osgeo import osr
 from bbox import Point, Bbox, Bboxs
 import shutil
 import logging
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO,
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -19,7 +20,7 @@ class Downloader:
         self.fs = s3fs.S3FileSystem(anon=True)
         self.root_dir = f"{save_dir}"
         self.boxes = Bboxs.read_file().boxes
-        self.hour_freq = 24
+        self.hour_freq = 1
         self.tmp_dir = "tmp"
         self.json_file = "cloud.json"
 
