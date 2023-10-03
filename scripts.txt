@@ -1,0 +1,8 @@
+# For finding valid tifs
+docker run  --rm  -v "/home/ubuntu/goes-16:/app" goes_downloader:stable python3 goes-16/check_fire.py
+
+# Dated download
+sudo rm goes_downloader.log && docker run -d --rm  -v "/home/ubuntu/goes-16:/app" goes_downloader:stable python3 goes-16/main.py -s DATA/ date -d 18-8-2023 20-8-2023
+
+# Export
+python3 goes-16/mosaic_update.py

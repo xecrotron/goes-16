@@ -1,3 +1,4 @@
 Pillow
 bbox
 s3fs
+psycopg2
