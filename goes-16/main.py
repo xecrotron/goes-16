@@ -37,15 +37,15 @@ if __name__ == "__main__":
         elif 'date' in args:
             logging.info(f"Bulk Downloading")
             down = GoesDownloaderDate(args.save,
-                                      datetime.strptime(args.date[0], '%d-%m-%Y'),
-                                      datetime.strptime(args.date[1], '%d-%m-%Y'))
+                                      datetime.strptime(args.date[0], '%Y-%m-%d'),
+                                      datetime.strptime(args.date[1], '%Y-%m-%d'))
             down.wildfire_map()
             down.run("ABI-L2-ACHAC", "cloud", "HT")
             down.run("ABI-L2-FDCC", "mask", "Mask")
             #down.run("ABI-L2-FDCC", "area", "Area")
             #down.run("ABI-L2-FDCC", "power", "Power")
             #down.run("ABI-L2-FDCC", "temp", "Temp")
-    logging.info("Finished process")
+        logging.info("Finished process")
     except Exception as e:
         if os.path.exists(os.path.join(args.save, 'tmp')):
             shutil.rmtree(os.path.join(args.save, 'tmp'))

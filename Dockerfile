@@ -22,5 +22,3 @@ COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
 RUN pip install GDAL==$(gdal-config --version)
-
-CMD ["python3", "goes-16/main.py"]
