@@ -4,5 +4,11 @@ docker run  --rm  -v "/home/ubuntu/goes-16:/app" goes_downloader:stable python3 
 # Dated download
 sudo rm goes_downloader.log && docker run -d --rm  -v "/home/ubuntu/goes-16:/app" goes_downloader:stable python3 goes-16/main.py -s DATA/ date -d 18-8-2023 20-8-2023
 
+# Latest download
+docker run -d --rm  -v "/home/ubuntu/goes-16:/app" goes_downloader:stable python3 goes-16/main.py -s DATA/ latest
+
 # Export
-python3 goes-16/mosaic_update.py
+docker run --network goes-16_default --rm  -v "/home/ubuntu/goes-16:/app" goes_downloader:stable python3 goes-16/mosaic_update.py
+
+# For bulk pipeline run
+./bulk_import.sh

@@ -1,6 +1,7 @@
 import os
 from random import randint
 import datetime
+import csv
 
 import numpy as np
 from osgeo import gdal
@@ -8,6 +9,7 @@ from osgeo import gdal
 data_dir = '/app/geoserver/datadir/mosaic_dir'
 regions = ['happy_camp', 'bigwood', 'carson', 'oakland']
 band = 'wld_map'
+csv_header = ['region', 'date', 'confidence']
 
 def __tif_validity(f_path, band):
     ds = gdal.Open(f_path)
@@ -23,14 +25,18 @@ def __tif_validity(f_path, band):
         return ingestion, np.mean(fire_found_raster)
     return None
 
-for region in regions:
-    region_dir = os.path.join(data_dir, region + '_' + band)
-    tif_files = [os.path.join(region_dir, file) for file in os.listdir(region_dir) if file.find('.tif') > -1]
-    fire_data = []
-    for tif_file in tif_files:
-        data = __tif_validity(tif_file, band)
-        if data is not None:
-            fire_data.append(data)
-    
-    print('-------------------- {} ------------------'.format(region))
-    print(fire_data)
+csv_file = f"{__file__}.csv".replace('.py', '')
+with open(csv_file, 'w') as f:
+    writer = csv.writer(f)
+    writer.writerow(csv_header)
+
+    for region in regions:
+        region_dir = os.path.join(data_dir, region + '_' + band)
+        tif_files = [os.path.join(region_dir, file) for file in os.listdir(region_dir) if file.find('.tif') > -1]
+        fire_data = []
+        for tif_file in tif_files:
+            data = __tif_validity(tif_file, band)
+            if data is not None:
+                fire_data.append([region, data[0], data[1]])
+        fire_data = sorted(fire_data, key = lambda x: str(x[1]))
+        writer.writerows(fire_data)
