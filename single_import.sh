@@ -5,8 +5,8 @@ source .env
 log_file='single_import.log'
 > $log_file
 
-start_date="2023-10-07"
-end_date="2023-10-09"
+start_date="2023-10-09"
+end_date="2023-10-11"
 
 echo "Running pipeline for $start_date - $end_date" >> $log_file 2>&1
 

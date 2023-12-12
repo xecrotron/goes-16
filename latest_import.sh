@@ -1,8 +1,10 @@
 set -e
 
-source .env
+BASEDIR=$(dirname "$0")
 
-log_file=$PWD/'latest_import.log'
+source $BASEDIR/.env
+
+log_file=$BASEDIR/'latest_import.log'
 > $log_file
 
 
