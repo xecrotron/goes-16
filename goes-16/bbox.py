@@ -27,7 +27,7 @@ class Bbox:
 class Bboxs:
     def __init__(self, boxes: List[Bbox]) -> None:
         self.boxes = boxes
-
+        
     @classmethod
     def read_file(cls):
         boxes = []

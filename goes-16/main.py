@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO,
     filemode="a"
 )
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(help="Type of Download")
     parser.add_argument("-s", "--save", required=True)
@@ -52,3 +52,6 @@ if __name__ == "__main__":
             logging.info('tmp dir removed.')
         logging.error(e, exc_info=True)
         raise
+
+if __name__ == "__main__":
+    main()

@@ -3,3 +3,4 @@ bbox
 s3fs
 psycopg2
 psycopg2-binary
+shapely
