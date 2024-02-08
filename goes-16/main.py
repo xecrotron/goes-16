@@ -1,7 +1,7 @@
 import os, shutil
 import argparse
 from goes_16_latest import GoesDownloaderLatest
-from goes_16_date import GoesDownloaderDate
+from goes_16_date import GoesDownloaderDate, GoesDownloaderIndividualBboxDate
 from datetime import datetime
 import logging
 
@@ -26,6 +26,11 @@ def main():
     try:
         if 'geojson' in args:
             logging.info(f"Bulk Downloading based on bbox geojson start & end dates")
+
+            down = GoesDownloaderIndividualBboxDate(args.save)
+            #down.wildfire_map()
+            down.run("ABI-L2-ACHAC", "cloud", "HT")
+            #down.run("ABI-L2-FDCC", "mask", "Mask")
 
         elif 'date' in args:
             logging.info(f"Bulk Downloading")
@@ -52,11 +57,10 @@ def main():
 
         logging.info("Finished process")
     except Exception as e:
-        if os.path.exists(os.path.join(args.save, 'tmp')):
-            shutil.rmtree(os.path.join(args.save, 'tmp'))
-            logging.info('tmp dir removed.')
         logging.error(e, exc_info=True)
         raise
+    finally:
+        down.clean_root_dir()
 
 if __name__ == "__main__":
     main()

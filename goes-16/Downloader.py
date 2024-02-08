@@ -1,27 +1,34 @@
-import s3fs
 from datetime import datetime
-from bbox import Bboxs
-import os
-from osgeo import osr
-from bbox import Point, Bbox, Bboxs
 import shutil
+import os
+import time
 import logging
+
+from osgeo import osr
+import s3fs
+import botocore
+
+from bbox import Point, Bbox, Bboxs
 
 logging.basicConfig(level=logging.INFO,
     format='%(asctime)s %(levelname)-8s %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
     filename="goes_downloader.log", 
-    filemode="a"
+    filemode="w"
 )
 
 class Downloader:
-    def __init__(self, save_dir) -> None:
+    def __init__(self, save_dir, read_bbox_datetime:bool=False) -> None:
         self.fs = s3fs.S3FileSystem(anon=True)
         self.root_dir = f"{save_dir}"
-        self.boxes = Bboxs.read_file().boxes
+        self.boxes = Bboxs.read_file(read_bbox_datetime).boxes
         self.hour_freq = 1
+        self.max_retries = 3
         self.tmp_dir = "tmp"
         self.json_file = "cloud.json"
+
+        if read_bbox_datetime:
+            self.hour_freq = None # Since we are downloading all available images in an hour
 
         self.__convert_to_WGS__()
 
@@ -33,7 +40,10 @@ class Downloader:
                 os.mkdir(f"{self.root_dir}/{box.id}")
 
     def clean_root_dir(self):
-        shutil.rmtree(f"{self.root_dir}/{self.tmp_dir}")
+        tmp_dir_path = f"{self.root_dir}/{self.tmp_dir}"
+        if os.path.exists(tmp_dir_path):
+            shutil.rmtree(f"{self.root_dir}/{self.tmp_dir}")
+        logging.info(f"Removed tmp directory- {tmp_dir_path}")
 
     def point_coversion(self, coord: Point):
         InSR = osr.SpatialReference()
@@ -53,7 +63,7 @@ class Downloader:
             for point in box.box:
                 p = self.point_coversion(point)
                 box_arr.append(p)
-            boxes.append(Bbox(box_arr, box.id, box.path))
+            boxes.append(Bbox(box_arr, box.id, box.path, box.start, box.end))
         self.boxes = Bboxs(boxes).boxes
 
 
@@ -90,6 +100,9 @@ class Downloader:
         return file_path
 
     def download(self, start:datetime, end:datetime, param:str, latest:bool=False):
+
+        logging.info(f"Starting download for date interval: {start} - {end}")
+
         # Check Year
         try:
             database_year = self.fs.ls(f"s3://noaa-goes16/{param}/")
@@ -107,6 +120,7 @@ class Downloader:
         # Check day
         start_date_in_year = (datetime(start.year, start.month, start.day) - datetime(start.year, 1, 1)).days + 1
         end_date_in_year = (datetime(end.year, end.month, end.day) - datetime(start.year, 1, 1)).days + 1
+
         try:
             database_day = self.fs.ls(f"s3://noaa-goes16/{param}/{start.year}")
             file_param_day = [int(x.split("/")[-1]) for x in database_day]
@@ -120,28 +134,58 @@ class Downloader:
         if not os.path.exists(f"{self.root_dir}/{self.tmp_dir}"):
             os.mkdir(f"{self.root_dir}/{self.tmp_dir}")
 
+
         for day in range(start_date_in_year, end_date_in_year + 1):
             try:
-                database_hour = self.fs.ls(f"s3://noaa-goes16/{param}/{start.year}/{day}")
+                day_str = '0' * (3 - len(str(day))) + str(day)
+                database_hour = self.fs.ls(f"s3://noaa-goes16/{param}/{start.year}/{day_str}")
                 file_param_hour = [int(x.split("/")[-1]) for x in database_hour]
             except Exception as e:
-                logging.error(f"Unable to query aws for {day}: {param}")
+                logging.error(f"Unable to query aws for {day_str}: {param}")
                 raise ValueError(f"Unable to load aws due to {e}")
 
             if latest:
                 hour = [file_param_hour[-1]]
+            if self.hour_freq is None:
+                hour = file_param_hour # Because we want to download all images available within an hour
             else:
                 hour = file_param_hour[::self.hour_freq]
 
             os.mkdir(f"{self.root_dir}/{self.tmp_dir}/{day}")
+
+            # Not downloading for hours that lie before start date hour and that lie after end date hour.
+            if day == start_date_in_year:
+                start_hour = start.hour
+                hour = list(filter(lambda e: e > start.hour, hour))
+            elif day == end_date_in_year:
+                end_hour = end.hour
+                hour = list(filter(lambda e: e < end.hour, hour))
+
             for hr in hour:
                 os.mkdir(f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}")
-                files = self.fs.ls(f"s3://noaa-goes16/{param}/{start.year}/{day}/{str(hr).zfill(2)}/")
+                files = self.fs.ls(f"s3://noaa-goes16/{param}/{start.year}/{day_str}/{str(hr).zfill(2)}/")
                 logging.info(f"Downloading files for {day}:{hr}")
-                try:
-                    self.fs.get(files, f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}/")
-                except Exception as e:
-                    logging.error(f"Unable to Download aws data for {day}: {param}")
-                    logging.info(f"Cleaning temp directory")
-                    self.clean_root_dir()
-                    raise ValueError(f"Unable to Download Data for {param}")
+
+                retries = 0
+                while retries < self.max_retries:
+
+                    try:
+                        logging.debug(f"Downloading files- {files}\n{self.root_dir}/{self.tmp_dir}/{day_str}/{hr}/")
+                        self.fs.get(files, f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}/")
+                        logging.info(f"Files have been downloaded")
+                        break
+                    except botocore.exceptions.ClientError as e:
+                        if e.response['Error']['Code'] == 'Throttling':
+                            backoff_time = (2 ** retries) * 120 # 120 seconds as base time
+                            logging.warning(f"Throttling detected. Retrying in {backoff_time} seconds.")
+                            time.sleep(backoff_time)
+                            retries += 1
+                        else:
+                            # For other errors, raise the exception
+                            logging.error(f"Unable to Download aws data for {day}: {param}")
+                            raise e
+                else:
+                    raise Exception(f"Failed to download file after {max_retries} retries.")
+    
+                break
+            break

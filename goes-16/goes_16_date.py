@@ -1,4 +1,6 @@
 from datetime import datetime
+from operator import itemgetter
+
 from osgeo import gdal
 import os
 from PIL import Image
@@ -13,12 +15,12 @@ logging.basicConfig(level=logging.INFO,
     format='%(asctime)s %(levelname)-8s %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
     filename="goes_downloader.log", 
-    filemode="a"
+    filemode="w"
 )
 
 
 class GoesDownloaderDate(Downloader):
-    def __init__(self, save_dir, start:datetime, end:datetime) -> None:
+    def __init__(self, save_dir, start:datetime=None, end:datetime=None) -> None:
         super().__init__(save_dir)
         self.start = start
         self.end = end
@@ -182,7 +184,65 @@ class GoesDownloaderDate(Downloader):
                                   options=options)
         self.clean_root_dir()
 
+class GoesDownloaderIndividualBboxDate(Downloader):
 
+    def __init__(self, save_dir) -> None:
+        super().__init__(save_dir, True)
+        self.start = None
+        self.end = None
+
+        self.__date_interval_bboxs__()
+        self.clean_root_dir()
+
+    def __date_interval_bboxs__(self):
+
+        date_intervals = [(box.start, box.end) for box in self.boxes]
+        self.start = min(date_intervals, key=itemgetter(0))[0]
+        self.end = max(date_intervals, key=itemgetter(1))[1]
+
+    def run(self, param, save_location, band):
+        
+        for box in self.boxes:
+            if not os.path.exists(f"{self.root_dir}/{box.id}/{save_location}"):
+                os.mkdir(f"{self.root_dir}/{box.id}/{save_location}/")
+
+        self.download(self.start, self.end, param, latest=False)
+
+        OutSR = osr.SpatialReference()
+        OutSR.SetFromUserInput("ESRI:102498")
+
+        for day in os.listdir(f"{self.root_dir}/{self.tmp_dir}/"):
+            for hr in os.listdir(f"{self.root_dir}/{self.tmp_dir}/{day}"):
+                for file in os.listdir(f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}"):
+                    directory = f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}"
+                    layer = gdal.Open("NETCDF:{0}:{1}".format(f"{directory}/{file}", band))
+                    options = gdal.TranslateOptions(format="GTiff")
+                    file_name = file.replace('.nc', '.tif')
+                    gdal.Translate(f"{directory}/{file_name}", layer, options=options)
+                    os.remove(f"{directory}/{file}")
+
+        for box in self.boxes:
+            start_day, start_hour = (box.start - datetime(box.start.year, 1, 1)).days + 1, box.start.hour
+            end_day, end_hour = (box.end - datetime(box.end.year, 1, 1)).days+ 1, box.end.hour
+            logging.debug(f"BoxID- {box.id}\tStart- {start_day} | {start_hour}\tEnd- {end_day} | {end_hour}")
+
+            #TODO- Get all dirs b/w start day/hr and end day/hr
+            directories = []
+
+            for directory in directories:
+                for file in os.listdir(directory):
+
+                    file_path = self.filename(file)
+
+                    options = gdal.WarpOptions(format="GTiff",
+                                               srcSRS=OutSR,
+                                               dstSRS='EPSG:3857',
+                                               cutlineDSName=f"{box.path}",
+                                               cropToCutline=True)
+
+                    gdal.Warp(f"{self.root_dir}/{box.id}/{save_location}/{file_path}",
+                              f"{directory}/{file}",
+                              options=options)
 
 if __name__ == "__main__":
     down = GoesDownloaderDate("/tmp/DATA", datetime(2023, 9, 30), datetime(2023, 10, 2))
