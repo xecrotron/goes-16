@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.INFO,
     format='%(asctime)s %(levelname)-8s %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
     filename="goes_downloader.log", 
-    filemode="a"
+    filemode="w"
 )
 
 def main():
@@ -20,19 +20,12 @@ def main():
     latest_parser = subparsers.add_parser("latest")
 
     datetime_parser = subparsers.add_parser("date")
-    datetime_parser.add_argument("-d", "--date", nargs=2, type=str, required=True)
+    datetime_parser.add_argument("-d", "--date", nargs=2, type=str, required=False)
+    datetime_parser.add_argument("-g", "--geojson", action='store_false', required=False)
     args = parser.parse_args()
     try:
-        if 'date' not in args:
-            logging.info(f"Downloading data {datetime.now()}")
-            down = GoesDownloaderLatest(args.save)
-            down.wildfire_map()
-            down.run("ABI-L2-ACHAC", "cloud", "HT")
-            down.run("ABI-L2-FDCC", "mask", "Mask")
-            #down.run("ABI-L2-FDCC", "area", "Area")
-            #down.run("ABI-L2-FDCC", "power", "Power")
-            #down.run("ABI-L2-FDCC", "temp", "Temp")
-            down.cloud_json()
+        if 'geojson' in args:
+            logging.info(f"Bulk Downloading based on bbox geojson start & end dates")
 
         elif 'date' in args:
             logging.info(f"Bulk Downloading")
@@ -45,6 +38,18 @@ def main():
             #down.run("ABI-L2-FDCC", "area", "Area")
             #down.run("ABI-L2-FDCC", "power", "Power")
             #down.run("ABI-L2-FDCC", "temp", "Temp")
+        
+        elif 'date' not in args:
+            logging.info(f"Downloading data {datetime.now()}")
+            down = GoesDownloaderLatest(args.save)
+            down.wildfire_map()
+            down.run("ABI-L2-ACHAC", "cloud", "HT")
+            down.run("ABI-L2-FDCC", "mask", "Mask")
+            #down.run("ABI-L2-FDCC", "area", "Area")
+            #down.run("ABI-L2-FDCC", "power", "Power")
+            #down.run("ABI-L2-FDCC", "temp", "Temp")
+            down.cloud_json()
+
         logging.info("Finished process")
     except Exception as e:
         if os.path.exists(os.path.join(args.save, 'tmp')):

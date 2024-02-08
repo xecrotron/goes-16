@@ -1,3 +1,6 @@
+# Project files
+geojson/
+
 # Python files
 *.pyc
 venv/
