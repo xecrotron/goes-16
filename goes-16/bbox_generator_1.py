@@ -69,6 +69,7 @@ def geojsonFile(file:str):
                 area_acres = properties['poly_GISAcres']
                 fireDisoveryDateTime = properties['poly_PolygonDateTime'] if properties['poly_PolygonDateTime'] is not None else properties['poly_CreateDate']
                 fireControlDateTime = properties['attr_ContainmentDateTime'] if properties['attr_ContainmentDateTime'] is not None else properties['attr_ModifiedOnDateTime_dt']
+                #fireControlDateTime = properties['attr_ContainmentDateTime'] if properties['attr_ContainmentDateTime'] is not None else None
 
                 if area_acres < 10.0 or (fireDisoveryDateTime is None or fireControlDateTime is None):
                     print(sourceOID, area_acres, fireDisoveryDateTime, fireControlDateTime)

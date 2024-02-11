@@ -55,3 +55,19 @@ Downloads images between start and end date, in above example 29-9-2023 & 1-10-2
 docker run --rm  -v ".:/app" goes_downloader:stable python3 goes-16/bbox_generator_1.py -f files/NIFC_2023_Wildfire_Perimeters.json
 ```
 Generates bbox using json file
+
+### Decoupled scripts
+```bash
+
+# First download cloud images for entire US
+$   sudo docker run --rm  -v ".:/app" goes_downloader:stable python3 goes-16/DOWNLOAD_dated_bbox.py -s /app/DATA/ -p ABI-L2-ACMC
+
+# Preprocess download cloud images (.nc to .tif conversion)
+$   sudo docker run --rm  -v ".:/app" goes_downloader:stable python3 goes-16/PREPROCESS_images_bbox.py -s /app/DATA/ -p ABI-L2-ACMC -b ?
+
+# Now download specific product images for entire US. In this example, we are taking ABI-L2-FDCC product
+$   sudo docker run --rm  -v ".:/app" goes_downloader:stable python3 goes-16/DOWNLOAD_dated_bbox.py -s /app/DATA/ -p ABI-L2-FDCC
+
+# Preprocess download images (.nc to .tif conversion, cloud masking and filling no-data values)
+$   sudo docker run --rm  -v ".:/app" goes_downloader:stable python3 goes-16/PREPROCESS_images_bbox.py -s /app/DATA/ -p ABI-L2-FDCC -b Mask
+```

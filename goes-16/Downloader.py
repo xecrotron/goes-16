@@ -39,10 +39,14 @@ class Downloader:
             if not os.path.exists(f"{self.root_dir}/{box.id}"):
                 os.mkdir(f"{self.root_dir}/{box.id}")
 
-    def clean_root_dir(self):
-        tmp_dir_path = f"{self.root_dir}/{self.tmp_dir}"
+    def clean_root_dir(self, param):
+        tmp_dir_path = os.path.join(self.root_dir, self.tmp_dir)
+
+        if param == 'ABI-L2-ACMC':
+            tmp_dir_path = os.path.join(self.root_dir, 'cloud_mask')
+
         if os.path.exists(tmp_dir_path):
-            shutil.rmtree(f"{self.root_dir}/{self.tmp_dir}")
+            shutil.rmtree(tmp_dir_path)
         logging.info(f"Removed tmp directory- {tmp_dir_path}")
 
     def point_coversion(self, coord: Point):
@@ -131,8 +135,11 @@ class Downloader:
             start_date_in_year -= 1
             end_date_in_year -= 1
 
-        if not os.path.exists(f"{self.root_dir}/{self.tmp_dir}"):
-            os.mkdir(f"{self.root_dir}/{self.tmp_dir}")
+        base_download_dir = os.path.join(self.root_dir, self.tmp_dir)
+        if param == 'ABI-L2-ACMC':
+            base_download_dir = os.path.join(self.root_dir, 'cloud_mask')
+        if not os.path.exists(base_download_dir):
+            os.mkdir(base_download_dir)
 
 
         for day in range(start_date_in_year, end_date_in_year + 1):
@@ -151,7 +158,8 @@ class Downloader:
             else:
                 hour = file_param_hour[::self.hour_freq]
 
-            os.mkdir(f"{self.root_dir}/{self.tmp_dir}/{day}")
+            day_download_dir = os.path.join(base_download_dir, str(day))
+            os.mkdir(day_download_dir)
 
             # Not downloading for hours that lie before start date hour and that lie after end date hour.
             if day == start_date_in_year:
@@ -162,7 +170,8 @@ class Downloader:
                 hour = list(filter(lambda e: e < end.hour, hour))
 
             for hr in hour:
-                os.mkdir(f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}")
+                hour_download_dir = os.path.join(day_download_dir, str(hr))
+                os.mkdir(hour_download_dir)
                 files = self.fs.ls(f"s3://noaa-goes16/{param}/{start.year}/{day_str}/{str(hr).zfill(2)}/")
                 logging.info(f"Downloading files for {day}:{hr}")
 
@@ -170,8 +179,8 @@ class Downloader:
                 while retries < self.max_retries:
 
                     try:
-                        logging.debug(f"Downloading files- {files}\n{self.root_dir}/{self.tmp_dir}/{day_str}/{hr}/")
-                        self.fs.get(files, f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}/")
+                        logging.debug(f"Downloading files- {files}\n{hour_download_dir}")
+                        self.fs.get(files, f"{hour_download_dir}/")
                         logging.info(f"Files have been downloaded")
                         break
                     except botocore.exceptions.ClientError as e:
@@ -186,6 +195,11 @@ class Downloader:
                             raise e
                 else:
                     raise Exception(f"Failed to download file after {max_retries} retries.")
+                
+                for file in os.listdir(hour_download_dir):
+                    source = os.path.join(hour_download_dir, file)
+                    dst = os.path.join(hour_download_dir, self.filename(file).replace('.tif', '.nc'))
+                    os.rename(source, dst)
     
                 break
             break

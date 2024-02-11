@@ -192,7 +192,6 @@ class GoesDownloaderIndividualBboxDate(Downloader):
         self.end = None
 
         self.__date_interval_bboxs__()
-        self.clean_root_dir()
 
     def __date_interval_bboxs__(self):
 
@@ -200,49 +199,30 @@ class GoesDownloaderIndividualBboxDate(Downloader):
         self.start = min(date_intervals, key=itemgetter(0))[0]
         self.end = max(date_intervals, key=itemgetter(1))[1]
 
-    def run(self, param, save_location, band):
-        
-        for box in self.boxes:
-            if not os.path.exists(f"{self.root_dir}/{box.id}/{save_location}"):
-                os.mkdir(f"{self.root_dir}/{box.id}/{save_location}/")
+    def pre_processing(self, param, band):
 
-        self.download(self.start, self.end, param, latest=False)
+        logging.info("Converting .nc files to .tif")
 
-        OutSR = osr.SpatialReference()
-        OutSR.SetFromUserInput("ESRI:102498")
-
-        for day in os.listdir(f"{self.root_dir}/{self.tmp_dir}/"):
-            for hr in os.listdir(f"{self.root_dir}/{self.tmp_dir}/{day}"):
-                for file in os.listdir(f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}"):
+        for day in os.listdir(os.path.join(self.root_dir, self.tmp_dir)):
+            for hr in os.listdir(os.path.join(self.root_dir, self.tmp_dir, day)):
+                for file in os.listdir(os.path.join(self.root_dir, self.tmp_dir, day, hr)):
                     directory = f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}"
-                    layer = gdal.Open("NETCDF:{0}:{1}".format(f"{directory}/{file}", band))
-                    options = gdal.TranslateOptions(format="GTiff")
-                    file_name = file.replace('.nc', '.tif')
-                    gdal.Translate(f"{directory}/{file_name}", layer, options=options)
-                    os.remove(f"{directory}/{file}")
 
-        for box in self.boxes:
-            start_day, start_hour = (box.start - datetime(box.start.year, 1, 1)).days + 1, box.start.hour
-            end_day, end_hour = (box.end - datetime(box.end.year, 1, 1)).days+ 1, box.end.hour
-            logging.debug(f"BoxID- {box.id}\tStart- {start_day} | {start_hour}\tEnd- {end_day} | {end_hour}")
+                    if file.endswith('.nc'):
+                        layer = gdal.Open("NETCDF:{0}:{1}".format(f"{directory}/{file}", band))
+                        options = gdal.TranslateOptions(format="GTiff")
+                        file_name = self.filename(file.replace('.nc', '.tif'))
 
-            #TODO- Get all dirs b/w start day/hr and end day/hr
-            directories = []
+                        gdal.Translate(f"{directory}/{file_name}", layer, options=options)
+                        os.remove(f"{directory}/{file}")
+        
+        logging.info("Performing cloud masking")
+        if param == 'ABI-L2-ACMC':
+            # TODO- Use cloud masks (present in args.save/cloud_mask) on these images and perform interpolation to fill no data values
+            pass
 
-            for directory in directories:
-                for file in os.listdir(directory):
-
-                    file_path = self.filename(file)
-
-                    options = gdal.WarpOptions(format="GTiff",
-                                               srcSRS=OutSR,
-                                               dstSRS='EPSG:3857',
-                                               cutlineDSName=f"{box.path}",
-                                               cropToCutline=True)
-
-                    gdal.Warp(f"{self.root_dir}/{box.id}/{save_location}/{file_path}",
-                              f"{directory}/{file}",
-                              options=options)
+    def crop_images_for_bboxs(self):
+        pass
 
 if __name__ == "__main__":
     down = GoesDownloaderDate("/tmp/DATA", datetime(2023, 9, 30), datetime(2023, 10, 2))
