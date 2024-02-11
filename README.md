@@ -63,7 +63,7 @@ Generates bbox using json file
 $   sudo docker run --rm  -v ".:/app" goes_downloader:stable python3 goes-16/DOWNLOAD_dated_bbox.py -s /app/DATA/ -p ABI-L2-ACMC
 
 # Preprocess download cloud images (.nc to .tif conversion)
-$   sudo docker run --rm  -v ".:/app" goes_downloader:stable python3 goes-16/PREPROCESS_images_bbox.py -s /app/DATA/ -p ABI-L2-ACMC -b ?
+$   sudo docker run --rm  -v ".:/app" goes_downloader:stable python3 goes-16/PREPROCESS_images_bbox.py -s /app/DATA/ -p ABI-L2-ACMC -b ACM
 
 # Now download specific product images for entire US. In this example, we are taking ABI-L2-FDCC product
 $   sudo docker run --rm  -v ".:/app" goes_downloader:stable python3 goes-16/DOWNLOAD_dated_bbox.py -s /app/DATA/ -p ABI-L2-FDCC

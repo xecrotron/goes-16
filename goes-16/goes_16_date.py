@@ -180,7 +180,7 @@ class GoesDownloaderDate(Downloader):
                                                    cropToCutline=True)
 
                         gdal.Warp(f"{self.root_dir}/{box.id}/{save_location}/{file_path}",
-                                  f"{directory}/{file}",
+                                  f"{directory}/{file}", #DATA/<box.id>/<param>/day/hr/file_basename
                                   options=options)
         self.clean_root_dir()
 
@@ -217,12 +217,14 @@ class GoesDownloaderIndividualBboxDate(Downloader):
                         os.remove(f"{directory}/{file}")
         
         logging.info("Performing cloud masking")
-        if param == 'ABI-L2-ACMC':
+        if param != 'ABI-L2-ACMC':
             # TODO- Use cloud masks (present in args.save/cloud_mask) on these images and perform interpolation to fill no data values
             pass
 
-    def crop_images_for_bboxs(self):
-        pass
+    def crop_images_for_bboxs(self, param):
+       if param != 'ABI-L2-ACMC':
+            # TODO- Crop images
+            pass
 
 if __name__ == "__main__":
     down = GoesDownloaderDate("/tmp/DATA", datetime(2023, 9, 30), datetime(2023, 10, 2))

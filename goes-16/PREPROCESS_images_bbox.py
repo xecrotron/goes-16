@@ -7,6 +7,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(help="Type of Download")
     parser.add_argument("-s", "--save", required=True)
+    parser.add_argument("-p", "--param", required=True)
     parser.add_argument("-b", "--band", required=True)
 
     args = parser.parse_args()
@@ -16,6 +17,7 @@ if __name__ == '__main__':
 
         down = GoesDownloaderIndividualBboxDate(args.save)
         down.pre_processing(args.band)
+        down.crop_images_for_bboxs(args.param)
         
         logging.info("Finished pre-processing")
     except Exception as e:
