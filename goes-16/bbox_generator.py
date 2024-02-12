@@ -9,6 +9,7 @@ from geojson import Polygon, Feature
 
 def generate_bounding_box_geojson(center_point, startDate, endDate, box_size_acres=10):
     box_size_km = box_size_acres*0.00404686
+    box_size_km=324
     center_latitude, center_longitude = center_point
 
     min_latitude = center_latitude - (box_size_km / 2) / 111.111
@@ -66,7 +67,7 @@ def shapelyFile(root:os,files:os):
                     sourceOID = property["poly_Sourc"]
                     acres= property['poly_GISAc']
                     fireDisoveryDateTime = property['attr_Fir_7']
-                    fireControlDateTime = property['attr_Contr']
+                    fireControlDateTime = property['attr_Conta']
                     bounding_box = shapely_geometry.bounds
                     if acres<10.0:
                         continue
@@ -89,7 +90,7 @@ def read_file(new_path: os):
 
 def main() -> None:
     base_path = os.getcwd()
-    new_path = os.path.join(base_path,"DATA")
+    new_path = os.path.join(base_path,"nifc")
     read_file(new_path)
 
 main()

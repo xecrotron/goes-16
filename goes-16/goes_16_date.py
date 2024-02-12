@@ -219,11 +219,46 @@ class GoesDownloaderIndividualBboxDate(Downloader):
         logging.info("Performing cloud masking")
         if param != 'ABI-L2-ACMC':
             # TODO- Use cloud masks (present in args.save/cloud_mask) on these images and perform interpolation to fill no data values
+            image = Image.open(f"{directory}/{file_name}")
+            width,height = image.size
+            pixel_data = image.load()
             pass
 
     def crop_images_for_bboxs(self, param):
        if param != 'ABI-L2-ACMC':
             # TODO- Crop images
+            OutSR = osr.SpatialReference()
+            OutSR.SetFromUserInput("ESRI:102498")
+            startDay = 244
+            endDay = 244
+            startHr = 0
+            endHr = 3
+            for day in range(startDay,endDay+1):
+                day = os.listdir(f"{self.root_dir}/{self.tmp_dir}/")
+                if day<startDay or day>endDay:
+                    continue
+                for hr in os.listdir(f"{self.root_dir}/{self.tmp_dir}/{day}"):
+                    if day==startDay and hr<startHr or day==endDay and hr>endHr:
+                        continue
+
+                    for file in os.listdir(f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}"):
+                        directory = f"{self.root_dir}/{self.tmp_dir}/{day}/{hr}"
+                        file_path = self.filename(file)
+                        for (box, box_path) in self.box_file_map.items():
+                            min_box_file = self.parse_filename(box_path[day][hr].replace(".tif", ""))["start_time"]
+                            if self.parse_filename(file.replace(".tif", ""))["start_time"] != min_box_file:
+                                continue
+
+                            options = gdal.WarpOptions(format="GTiff",
+                                                    srcSRS=OutSR,
+                                                    dstSRS='EPSG:3857',
+                                                    cutlineDSName=f"{box.path}",
+                                                    cropToCutline=True)
+
+                            gdal.Warp(f"{self.root_dir}/{box.id}/{param}/{day}/{hr}/{file_path}",
+                                  f"{directory}/{file}", #DATA/<box.id>/<param>/day/hr/file_basename
+                                  options=options)
+            
             pass
 
 if __name__ == "__main__":
@@ -233,4 +268,6 @@ if __name__ == "__main__":
     down.run("ABI-L2-FDCC", "mask", "Mask")
     down.run("ABI-L2-FDCC", "area", "Area")
     down.run("ABI-L2-FDCC", "power", "Power")
-    down.run("ABI-L2-FDCC", "temp", "Temp")
+    down.run("ABI-L2-FDCC", "temp", "Temp") 
+
+    GoesDownloaderIndividualBboxDate.crop_images_for_bboxs()
